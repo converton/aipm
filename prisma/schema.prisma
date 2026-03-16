@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ProjectStatus {
+  draft
+  active
+  at_risk
+  completed
+}
+
+enum WorkItemStatus {
+  not_started
+  in_progress
+  blocked
+  done
+}
+
+enum RiskStatus {
+  open
+  monitoring
+  closed
+}
+
+enum MilestoneStatus {
+  upcoming
+  at_risk
+  complete
+}
+
+model Workspace {
+  id        String    @id @default(cuid())
+  name      String
+  createdAt DateTime  @default(now())
+  users     User[]
+  projects  Project[]
+}
+
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  email       String    @unique
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  title       String
+  goal        String?
+  brief       String
+  projectType String
+  teamSize    Int
+  targetDate  DateTime
+  status      ProjectStatus @default(draft)
+  healthScore Int           @default(100)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  phases       Phase[]
+  workItems    WorkItem[]
+  milestones   Milestone[]
+  dependencies Dependency[]
+  risks        Risk[]
+  updates      Update[]
+}
+
+model Phase {
+  id       String    @id @default(cuid())
+  projectId String
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name     String
+  order    Int
+  workItems WorkItem[]
+}
+
+model WorkItem {
+  id            String         @id @default(cuid())
+  projectId     String
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  phaseId       String?
+  phase         Phase?         @relation(fields: [phaseId], references: [id], onDelete: SetNull)
+  title         String
+  description   String
+  owner         String?
+  status        WorkItemStatus @default(not_started)
+  priority      String
+  dueDate       DateTime
+  lastActivityAt DateTime      @default(now())
+  aiSummary     String?
+
+  dependenciesFrom Dependency[] @relation("FromWorkItem")
+  dependenciesTo   Dependency[] @relation("ToWorkItem")
+}
+
+model Milestone {
+  id        String          @id @default(cuid())
+  projectId String
+  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  dueDate   DateTime
+  status    MilestoneStatus @default(upcoming)
+}
+
+model Dependency {
+  id             String   @id @default(cuid())
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromWorkItemId String
+  toWorkItemId   String
+  fromWorkItem   WorkItem @relation("FromWorkItem", fields: [fromWorkItemId], references: [id], onDelete: Cascade)
+  toWorkItem     WorkItem @relation("ToWorkItem", fields: [toWorkItemId], references: [id], onDelete: Cascade)
+  type           String
+}
+
+model Risk {
+  id          String     @id @default(cuid())
+  projectId   String
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  severity    String
+  mitigation  String
+  status      RiskStatus @default(open)
+}
+
+model Update {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type      String
+  content   String
+  createdAt DateTime @default(now())
+}
